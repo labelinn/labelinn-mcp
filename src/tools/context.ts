@@ -6,6 +6,7 @@
  * These are beyond CRUD — they synthesize context.
  */
 import { LabelInnClient } from '../utils/api-client.js';
+import { z } from 'zod';
 
 export function registerContextTools(server: any, client: LabelInnClient) {
   // ── factory_status ──
@@ -58,7 +59,7 @@ export function registerContextTools(server: any, client: LabelInnClient) {
     'Run a comprehensive diagnostic on a specific printer. Returns health score, ' +
     'recent job success rate, error patterns, media status, and recommended actions.',
     {
-      printer_id: { type: 'string', description: 'The printer ID to diagnose' },
+      printer_id: z.string().describe('The printer ID to diagnose'),
     },
     async (params: { printer_id: string }) => {
       const results: Record<string, unknown> = {};
@@ -111,15 +112,8 @@ export function registerContextTools(server: any, client: LabelInnClient) {
     'Given a label format (ZPL, ESC/POS, image) and optional site, suggest the best available ' +
     'printer based on health scores, current load, and compatibility.',
     {
-      format: {
-        type: 'string',
-        description: 'Label format: "zpl", "escpos", "image", "pdf"',
-      },
-      site_id: {
-        type: 'string',
-        description: 'Optional site to restrict printer selection',
-        required: false,
-      },
+      format: z.string().describe('Label format: "zpl", "escpos", "image", "pdf"'),
+      site_id: z.string().optional().describe('Optional site to restrict printer selection'),
     },
     async (params: { format: string; site_id?: string }) => {
       // Get all printers
@@ -157,8 +151,8 @@ export function registerContextTools(server: any, client: LabelInnClient) {
     'Explain a print job error code or message. Returns human-readable explanation, ' +
     'possible causes, and suggested fixes. Useful for AI-driven troubleshooting.',
     {
-      error: { type: 'string', description: 'Error code or message from a failed print job' },
-      printer_id: { type: 'string', description: 'Optional printer ID for context', required: false },
+      error: z.string().describe('Error code or message from a failed print job'),
+      printer_id: z.string().optional().describe('Optional printer ID for context'),
     },
     async (params: { error: string; printer_id?: string }) => {
       // Known error patterns

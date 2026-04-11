@@ -9,6 +9,7 @@
  * 4. Generate comprehensive reports
  */
 import { LabelInnClient } from '../utils/api-client.js';
+import { z } from 'zod';
 
 // ── Types ──
 interface TestResult {
@@ -53,7 +54,7 @@ export function registerTestingTools(server: any, _client: LabelInnClient) {
     'skynet_start_session',
     'Start a new SKYNET autonomous test session. This initializes the test tracker. Call this BEFORE running any tests.',
     {
-      description: { type: 'string', description: 'What this session is testing (e.g., "Full system E2E test")' },
+      description: z.string().describe('What this session is testing (e.g., "Full system E2E test")'),
     },
     async (params: { description: string }) => {
       const id = `skynet-${Date.now()}`;
@@ -89,12 +90,12 @@ export function registerTestingTools(server: any, _client: LabelInnClient) {
     'skynet_run_test',
     'Record the result of a test you just ran. Call this AFTER executing a test via other MCP tools. Status: pass, fail, skip, blocked.',
     {
-      name: { type: 'string', description: 'Test name (e.g., "Print ZPL to Zebra ZD420")' },
-      category: { type: 'string', description: 'Category: "health", "fleet", "print", "design", "verify", "rules", "edge", "audit", "sites", "connect", "error_handling"' },
-      status: { type: 'string', description: '"pass", "fail", "skip", or "blocked"' },
-      error: { type: 'string', description: 'Error message if failed', required: false },
-      details: { type: 'object', description: 'Any additional details (response data, etc.)', required: false },
-      duration_ms: { type: 'number', description: 'How long the test took in ms', required: false },
+      name: z.string().describe('Test name (e.g., "Print ZPL to Zebra ZD420")'),
+      category: z.string().describe('Category: "health", "fleet", "print", "design", "verify", "rules", "edge", "audit", "sites", "connect", "error_handling"'),
+      status: z.string().describe('"pass", "fail", "skip", or "blocked"'),
+      error: z.string().optional().describe('Error message if failed'),
+      details: z.record(z.string(), z.unknown()).optional().describe('Any additional details (response data, etc.)'),
+      duration_ms: z.number().optional().describe('How long the test took in ms'),
     },
     async (params: { name: string; category: string; status: string; error?: string; details?: unknown; duration_ms?: number }) => {
       const session = getActive();
@@ -146,9 +147,9 @@ export function registerTestingTools(server: any, _client: LabelInnClient) {
     'skynet_record_fix',
     'Record that you applied a code fix. Call this after editing a file to fix a failing test.',
     {
-      test_name: { type: 'string', description: 'Which test this fix is for' },
-      file: { type: 'string', description: 'File path that was modified' },
-      description: { type: 'string', description: 'What was changed and why' },
+      test_name: z.string().describe('Which test this fix is for'),
+      file: z.string().describe('File path that was modified'),
+      description: z.string().describe('What was changed and why'),
     },
     async (params: { test_name: string; file: string; description: string }) => {
       const session = getActive();
@@ -185,8 +186,8 @@ export function registerTestingTools(server: any, _client: LabelInnClient) {
     'skynet_record_restart',
     'Record that you restarted a service. Call this after restarting Edge Server, app, or other services.',
     {
-      service: { type: 'string', description: 'What was restarted: "edge_server", "app", "relay", "cloud_function"' },
-      reason: { type: 'string', description: 'Why it was restarted' },
+      service: z.string().describe('What was restarted: "edge_server", "app", "relay", "cloud_function"'),
+      reason: z.string().describe('Why it was restarted'),
     },
     async (params: { service: string; reason: string }) => {
       const session = getActive();
@@ -210,7 +211,7 @@ export function registerTestingTools(server: any, _client: LabelInnClient) {
     'skynet_add_note',
     'Add a note to the test session. Use for observations, warnings, or context.',
     {
-      note: { type: 'string', description: 'The note to add' },
+      note: z.string().describe('The note to add'),
     },
     async (params: { note: string }) => {
       const session = getActive();
@@ -258,7 +259,7 @@ export function registerTestingTools(server: any, _client: LabelInnClient) {
     'skynet_end_session',
     'End the test session and generate a full report. Call this when all tests are done.',
     {
-      conclusion: { type: 'string', description: 'Your conclusion about the system state', required: false },
+      conclusion: z.string().optional().describe('Your conclusion about the system state'),
     },
     async (params: { conclusion?: string }) => {
       const session = getActive();

@@ -1,14 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerPrintTools = registerPrintTools;
+const zod_1 = require("zod");
 function registerPrintTools(server, client) {
     // ── print_label ──
     server.tool('print_label', 'Print a label using a saved design template with variable data. This is the most common way to print.', {
-        printer_id: { type: 'string', description: 'Target printer ID' },
-        design_id: { type: 'string', description: 'Design template ID to use' },
-        data: { type: 'object', description: 'Template variable values (e.g. {"barcode":"TR123","name":"Ali"})', required: false },
-        copies: { type: 'number', description: 'Number of copies (default: 1)', required: false },
-        job_name: { type: 'string', description: 'Optional job name for tracking', required: false },
+        printer_id: zod_1.z.string().describe('Target printer ID'),
+        design_id: zod_1.z.string().describe('Design template ID to use'),
+        data: zod_1.z.record(zod_1.z.string(), zod_1.z.unknown()).optional().describe('Template variable values (e.g. {"barcode":"TR123","name":"Ali"})'),
+        copies: zod_1.z.number().optional().describe('Number of copies (default: 1)'),
+        job_name: zod_1.z.string().optional().describe('Optional job name for tracking'),
     }, async (params) => {
         const result = await client.createPrintJob({
             printer_id: params.printer_id,
@@ -22,9 +23,9 @@ function registerPrintTools(server, client) {
     });
     // ── print_zpl ──
     server.tool('print_zpl', 'Send raw ZPL commands directly to a Zebra/TSC thermal printer. Use this only when you have pre-built ZPL code.', {
-        printer_id: { type: 'string', description: 'Target printer ID' },
-        zpl_code: { type: 'string', description: 'Raw ZPL command string' },
-        copies: { type: 'number', description: 'Number of copies', required: false },
+        printer_id: zod_1.z.string().describe('Target printer ID'),
+        zpl_code: zod_1.z.string().describe('Raw ZPL command string'),
+        copies: zod_1.z.number().optional().describe('Number of copies'),
     }, async (params) => {
         const result = await client.createPrintJob({
             printer_id: params.printer_id,
@@ -36,9 +37,9 @@ function registerPrintTools(server, client) {
     });
     // ── print_image ──
     server.tool('print_image', 'Print a label from an image URL. LabelInn downloads the image and converts it to the printer format automatically.', {
-        printer_id: { type: 'string', description: 'Target printer ID' },
-        image_url: { type: 'string', description: 'HTTPS URL to a PNG or JPEG label image' },
-        copies: { type: 'number', description: 'Number of copies', required: false },
+        printer_id: zod_1.z.string().describe('Target printer ID'),
+        image_url: zod_1.z.string().describe('HTTPS URL to a PNG or JPEG label image'),
+        copies: zod_1.z.number().optional().describe('Number of copies'),
     }, async (params) => {
         const result = await client.createPrintJob({
             printer_id: params.printer_id,

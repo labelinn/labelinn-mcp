@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerContextTools = registerContextTools;
+const zod_1 = require("zod");
 function registerContextTools(server, client) {
     // ── factory_status ──
     server.tool('factory_status', 'Get a comprehensive factory floor overview: printer fleet health, active jobs, ' +
@@ -40,7 +41,7 @@ function registerContextTools(server, client) {
     // ── diagnose_printer ──
     server.tool('diagnose_printer', 'Run a comprehensive diagnostic on a specific printer. Returns health score, ' +
         'recent job success rate, error patterns, media status, and recommended actions.', {
-        printer_id: { type: 'string', description: 'The printer ID to diagnose' },
+        printer_id: zod_1.z.string().describe('The printer ID to diagnose'),
     }, async (params) => {
         const results = {};
         const pid = params.printer_id;
@@ -84,15 +85,8 @@ function registerContextTools(server, client) {
     // ── suggest_printer ──
     server.tool('suggest_printer', 'Given a label format (ZPL, ESC/POS, image) and optional site, suggest the best available ' +
         'printer based on health scores, current load, and compatibility.', {
-        format: {
-            type: 'string',
-            description: 'Label format: "zpl", "escpos", "image", "pdf"',
-        },
-        site_id: {
-            type: 'string',
-            description: 'Optional site to restrict printer selection',
-            required: false,
-        },
+        format: zod_1.z.string().describe('Label format: "zpl", "escpos", "image", "pdf"'),
+        site_id: zod_1.z.string().optional().describe('Optional site to restrict printer selection'),
     }, async (params) => {
         // Get all printers
         const printers = (await client.listPrinters('online'));
@@ -123,8 +117,8 @@ function registerContextTools(server, client) {
     // ── explain_error ──
     server.tool('explain_error', 'Explain a print job error code or message. Returns human-readable explanation, ' +
         'possible causes, and suggested fixes. Useful for AI-driven troubleshooting.', {
-        error: { type: 'string', description: 'Error code or message from a failed print job' },
-        printer_id: { type: 'string', description: 'Optional printer ID for context', required: false },
+        error: zod_1.z.string().describe('Error code or message from a failed print job'),
+        printer_id: zod_1.z.string().optional().describe('Optional printer ID for context'),
     }, async (params) => {
         // Known error patterns
         const knownErrors = {

@@ -2,6 +2,7 @@
  * Sites, Analytics & Predictions MCP tools
  */
 import { LabelInnClient } from '../utils/api-client.js';
+import { z } from 'zod';
 
 export function registerSitesTools(server: any, client: LabelInnClient) {
   // ── create_site ──
@@ -9,11 +10,11 @@ export function registerSitesTools(server: any, client: LabelInnClient) {
     'create_site',
     'Create a site (factory, warehouse, office) for multi-location management.',
     {
-      name: { type: 'string', description: 'Site name (e.g., "Istanbul Warehouse")' },
-      address: { type: 'string', description: 'Physical address', required: false },
-      latitude: { type: 'number', description: 'GPS latitude for geo-routing', required: false },
-      longitude: { type: 'number', description: 'GPS longitude for geo-routing', required: false },
-      timezone: { type: 'string', description: 'Timezone (e.g., "Europe/Istanbul")', required: false },
+      name: z.string().describe('Site name (e.g., "Istanbul Warehouse")'),
+      address: z.string().optional().describe('Physical address'),
+      latitude: z.number().optional().describe('GPS latitude for geo-routing'),
+      longitude: z.number().optional().describe('GPS longitude for geo-routing'),
+      timezone: z.string().optional().describe('Timezone (e.g., "Europe/Istanbul")'),
     },
     async (params: { name: string; address?: string; latitude?: number; longitude?: number; timezone?: string }) => {
       const site: Record<string, unknown> = { name: params.name };
@@ -43,7 +44,7 @@ export function registerSitesTools(server: any, client: LabelInnClient) {
     'get_site',
     'Get site details including assigned printers and stats.',
     {
-      site_id: { type: 'string', description: 'The site ID' },
+      site_id: z.string().describe('The site ID'),
     },
     async (params: { site_id: string }) => {
       const site = await client.getSite(params.site_id);
@@ -56,8 +57,8 @@ export function registerSitesTools(server: any, client: LabelInnClient) {
     'assign_printers_to_site',
     'Assign printers to a specific site/location.',
     {
-      site_id: { type: 'string', description: 'The site ID' },
-      printer_ids: { type: 'array', description: 'Array of printer IDs to assign' },
+      site_id: z.string().describe('The site ID'),
+      printer_ids: z.array(z.unknown()).describe('Array of printer IDs to assign'),
     },
     async (params: { site_id: string; printer_ids: string[] }) => {
       const result = await client.assignPrintersToSite(params.site_id, params.printer_ids);
@@ -70,8 +71,8 @@ export function registerSitesTools(server: any, client: LabelInnClient) {
     'find_nearest_site',
     'Find the nearest site to GPS coordinates. Used for geo-routing print jobs to the closest location.',
     {
-      latitude: { type: 'number', description: 'GPS latitude' },
-      longitude: { type: 'number', description: 'GPS longitude' },
+      latitude: z.number().describe('GPS latitude'),
+      longitude: z.number().describe('GPS longitude'),
     },
     async (params: { latitude: number; longitude: number }) => {
       const result = await client.findNearestSite(params.latitude, params.longitude);
@@ -84,7 +85,7 @@ export function registerSitesTools(server: any, client: LabelInnClient) {
     'get_site_analytics',
     'Get printing analytics for a specific site: job counts, success rate, throughput.',
     {
-      site_id: { type: 'string', description: 'The site ID' },
+      site_id: z.string().describe('The site ID'),
     },
     async (params: { site_id: string }) => {
       const result = await client.getSiteAnalytics(params.site_id);
@@ -97,7 +98,7 @@ export function registerSitesTools(server: any, client: LabelInnClient) {
     'get_predictions',
     'Get predictive maintenance data: when will the printer need service? Supply depletion ETA? Failure probability?',
     {
-      printer_id: { type: 'string', description: 'The printer ID' },
+      printer_id: z.string().describe('The printer ID'),
     },
     async (params: { printer_id: string }) => {
       const result = await client.getPredictions(params.printer_id);
@@ -110,7 +111,7 @@ export function registerSitesTools(server: any, client: LabelInnClient) {
     'get_fleet_trends',
     'Get fleet-wide health trends and distribution. Shows how the fleet is performing over time.',
     {
-      period: { type: 'string', description: '"7d", "14d", or "30d"', required: false },
+      period: z.string().optional().describe('"7d", "14d", or "30d"'),
     },
     async (params: { period?: string }) => {
       const result = await client.getFleetTrends(params.period);
@@ -123,7 +124,7 @@ export function registerSitesTools(server: any, client: LabelInnClient) {
     'get_quality_score',
     'Get the print quality score for a printer. Factors: success rate, verification rate, consistency.',
     {
-      printer_id: { type: 'string', description: 'The printer ID' },
+      printer_id: z.string().describe('The printer ID'),
     },
     async (params: { printer_id: string }) => {
       const result = await client.getQualityScore(params.printer_id);
@@ -136,9 +137,9 @@ export function registerSitesTools(server: any, client: LabelInnClient) {
     'simulate_print',
     'Digital Twin: simulate printing a design on a printer without actually printing. Shows estimated duration, success rate, risks.',
     {
-      design_id: { type: 'string', description: 'The design to simulate' },
-      printer_id: { type: 'string', description: 'Target printer (optional — simulates on any)', required: false },
-      copies: { type: 'number', description: 'Number of copies to simulate', required: false },
+      design_id: z.string().describe('The design to simulate'),
+      printer_id: z.string().optional().describe('Target printer (optional — simulates on any)'),
+      copies: z.number().optional().describe('Number of copies to simulate'),
     },
     async (params: { design_id: string; printer_id?: string; copies?: number }) => {
       const result = await client.simulatePrint(params.design_id, params.printer_id, params.copies);
@@ -151,7 +152,7 @@ export function registerSitesTools(server: any, client: LabelInnClient) {
     'compare_scenarios',
     'Digital Twin: compare two or more printing scenarios. Useful for capacity planning and what-if analysis.',
     {
-      scenarios: { type: 'array', description: 'Array of scenario objects to compare' },
+      scenarios: z.array(z.unknown()).describe('Array of scenario objects to compare'),
     },
     async (params: { scenarios: unknown[] }) => {
       const result = await client.post('/analytics/digital-twin/compare', { scenarios: params.scenarios });
@@ -164,8 +165,8 @@ export function registerSitesTools(server: any, client: LabelInnClient) {
     'get_daily_usage',
     'Get daily usage breakdown by date range.',
     {
-      start_date: { type: 'string', description: 'Start date (YYYY-MM-DD)', required: false },
-      end_date: { type: 'string', description: 'End date (YYYY-MM-DD)', required: false },
+      start_date: z.string().optional().describe('Start date (YYYY-MM-DD)'),
+      end_date: z.string().optional().describe('End date (YYYY-MM-DD)'),
     },
     async (params: { start_date?: string; end_date?: string }) => {
       const qs = new URLSearchParams();

@@ -2,6 +2,7 @@
  * Job management MCP tools
  */
 import { LabelInnClient } from '../utils/api-client.js';
+import { z } from 'zod';
 
 export function registerJobTools(server: any, client: LabelInnClient) {
   // ── list_jobs ──
@@ -9,8 +10,8 @@ export function registerJobTools(server: any, client: LabelInnClient) {
     'list_jobs',
     'List recent print jobs with optional status filter. Shows job ID, status, type, printer, and timestamps.',
     {
-      status: { type: 'string', description: 'Filter by: "queued", "completed", "failed", "cancelled"', required: false },
-      limit: { type: 'number', description: 'Max results (default: 20)', required: false },
+      status: z.string().optional().describe('Filter by: "queued", "completed", "failed", "cancelled"'),
+      limit: z.number().optional().describe('Max results (default: 20)'),
     },
     async (params: { status?: string; limit?: number }) => {
       const jobs = await client.listJobs(params);
@@ -23,7 +24,7 @@ export function registerJobTools(server: any, client: LabelInnClient) {
     'get_job',
     'Get detailed status of a specific print job including timing, printer info, and any error details.',
     {
-      job_id: { type: 'string', description: 'The job ID to look up' },
+      job_id: z.string().describe('The job ID to look up'),
     },
     async (params: { job_id: string }) => {
       const job = await client.getJob(params.job_id);
@@ -36,7 +37,7 @@ export function registerJobTools(server: any, client: LabelInnClient) {
     'cancel_job',
     'Cancel a queued print job before it reaches the printer.',
     {
-      job_id: { type: 'string', description: 'The job ID to cancel' },
+      job_id: z.string().describe('The job ID to cancel'),
     },
     async (params: { job_id: string }) => {
       const result = await client.cancelJob(params.job_id);
@@ -49,9 +50,9 @@ export function registerJobTools(server: any, client: LabelInnClient) {
     'reprint_job',
     'Reprint a previous print job, optionally changing the target printer or number of copies.',
     {
-      job_id: { type: 'string', description: 'The original job ID to reprint' },
-      printer_id: { type: 'string', description: 'Override target printer', required: false },
-      copies: { type: 'number', description: 'Override copy count', required: false },
+      job_id: z.string().describe('The original job ID to reprint'),
+      printer_id: z.string().optional().describe('Override target printer'),
+      copies: z.number().optional().describe('Override copy count'),
     },
     async (params: { job_id: string; printer_id?: string; copies?: number }) => {
       const result = await client.reprintJob(params.job_id, {

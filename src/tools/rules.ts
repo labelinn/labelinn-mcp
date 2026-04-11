@@ -2,6 +2,7 @@
  * Rules Engine MCP tools
  */
 import { LabelInnClient } from '../utils/api-client.js';
+import { z } from 'zod';
 
 export function registerRulesTools(server: any, client: LabelInnClient) {
   // ── create_rule ──
@@ -9,12 +10,12 @@ export function registerRulesTools(server: any, client: LabelInnClient) {
     'create_rule',
     'Create a no-code automation rule. Rules trigger on events (print job created, printer offline, etc.) and execute actions (reroute, add label, notify).',
     {
-      name: { type: 'string', description: 'Rule name (e.g., "Fragile Label for Heavy Items")' },
-      trigger: { type: 'string', description: 'Trigger event: "printJobCreated", "printJobCompleted", "printJobFailed", "printerStatusChanged", "supplyAlert", "verifyScanPassed", "verifyScanFailed", "scheduleDaily", "manual"' },
-      conditions: { type: 'array', description: 'Array of condition objects: [{field, operator, value}]. Operators: eq, neq, gt, gte, lt, lte, contains, startsWith, endsWith, inList, exists, matches' },
-      actions: { type: 'array', description: 'Array of action objects: [{type, ...params}]. Types: addLabel, setCopies, routeToGroup, routeToPrinter, setPriority, sendWebhook, cancelJob, delay, transformData, log, notify' },
-      enabled: { type: 'boolean', description: 'Whether the rule is active', required: false },
-      priority: { type: 'number', description: 'Priority (lower = higher priority)', required: false },
+      name: z.string().describe('Rule name (e.g., "Fragile Label for Heavy Items")'),
+      trigger: z.string().describe('Trigger event: "printJobCreated", "printJobCompleted", "printJobFailed", "printerStatusChanged", "supplyAlert", "verifyScanPassed", "verifyScanFailed", "scheduleDaily", "manual"'),
+      conditions: z.array(z.unknown()).describe('Array of condition objects: [{field, operator, value}]. Operators: eq, neq, gt, gte, lt, lte, contains, startsWith, endsWith, inList, exists, matches'),
+      actions: z.array(z.unknown()).describe('Array of action objects: [{type, ...params}]. Types: addLabel, setCopies, routeToGroup, routeToPrinter, setPriority, sendWebhook, cancelJob, delay, transformData, log, notify'),
+      enabled: z.boolean().optional().describe('Whether the rule is active'),
+      priority: z.number().optional().describe('Priority (lower = higher priority)'),
     },
     async (params: { name: string; trigger: string; conditions: unknown[]; actions: unknown[]; enabled?: boolean; priority?: number }) => {
       const result = await client.createRule(params);
@@ -38,7 +39,7 @@ export function registerRulesTools(server: any, client: LabelInnClient) {
     'get_rule',
     'Get details of a specific rule.',
     {
-      rule_id: { type: 'string', description: 'The rule ID' },
+      rule_id: z.string().describe('The rule ID'),
     },
     async (params: { rule_id: string }) => {
       const rule = await client.getRule(params.rule_id);
@@ -51,12 +52,12 @@ export function registerRulesTools(server: any, client: LabelInnClient) {
     'update_rule',
     'Update an existing rule\'s conditions, actions, or enabled status.',
     {
-      rule_id: { type: 'string', description: 'The rule ID' },
-      name: { type: 'string', description: 'New name', required: false },
-      enabled: { type: 'boolean', description: 'Enable or disable', required: false },
-      conditions: { type: 'array', description: 'New conditions array', required: false },
-      actions: { type: 'array', description: 'New actions array', required: false },
-      priority: { type: 'number', description: 'New priority', required: false },
+      rule_id: z.string().describe('The rule ID'),
+      name: z.string().optional().describe('New name'),
+      enabled: z.boolean().optional().describe('Enable or disable'),
+      conditions: z.array(z.unknown()).optional().describe('New conditions array'),
+      actions: z.array(z.unknown()).optional().describe('New actions array'),
+      priority: z.number().optional().describe('New priority'),
     },
     async (params: { rule_id: string; [key: string]: unknown }) => {
       const { rule_id, ...data } = params;
@@ -70,7 +71,7 @@ export function registerRulesTools(server: any, client: LabelInnClient) {
     'delete_rule',
     'Delete an automation rule.',
     {
-      rule_id: { type: 'string', description: 'The rule ID to delete' },
+      rule_id: z.string().describe('The rule ID to delete'),
     },
     async (params: { rule_id: string }) => {
       const result = await client.deleteRule(params.rule_id);
@@ -83,8 +84,8 @@ export function registerRulesTools(server: any, client: LabelInnClient) {
     'test_rule',
     'Dry-run test a rule against sample data. Shows what would happen without actually executing actions.',
     {
-      rule_id: { type: 'string', description: 'The rule ID to test' },
-      sample_data: { type: 'object', description: 'Sample context data to evaluate the rule against (e.g., {"data.weight_kg": 15, "printer.status": "offline"})' },
+      rule_id: z.string().describe('The rule ID to test'),
+      sample_data: z.record(z.string(), z.unknown()).describe('Sample context data to evaluate the rule against (e.g., {"data.weight_kg": 15, "printer.status": "offline"})'),
     },
     async (params: { rule_id: string; sample_data: Record<string, unknown> }) => {
       const result = await client.testRule(params.rule_id, params.sample_data);

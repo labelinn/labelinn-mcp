@@ -6,6 +6,7 @@
 import { LabelInnClient } from '../utils/api-client.js';
 import { execSync } from 'child_process';
 import * as os from 'os';
+import { z } from 'zod';
 
 export function registerSystemTools(server: any, client: LabelInnClient) {
   // ── system_health_check ──
@@ -86,7 +87,7 @@ export function registerSystemTools(server: any, client: LabelInnClient) {
     'restart_edge_server',
     'Restart the Edge Server. Use this after applying code fixes or when the server is unresponsive.',
     {
-      reason: { type: 'string', description: 'Why you are restarting (for audit trail)' },
+      reason: z.string().describe('Why you are restarting (for audit trail)'),
     },
     async (params: { reason: string }) => {
       try {
@@ -104,8 +105,8 @@ export function registerSystemTools(server: any, client: LabelInnClient) {
     'get_edge_logs',
     'Get recent Edge Server logs. Use this to diagnose failures after a test fails.',
     {
-      limit: { type: 'number', description: 'Number of log entries (default 50)', required: false },
-      level: { type: 'string', description: 'Filter by level: "error", "warning", "info", "debug"', required: false },
+      limit: z.number().optional().describe('Number of log entries (default 50)'),
+      level: z.string().optional().describe('Filter by level: "error", "warning", "info", "debug"'),
     },
     async (params: { limit?: number; level?: string }) => {
       try {
@@ -183,7 +184,7 @@ export function registerSystemTools(server: any, client: LabelInnClient) {
     'update_edge_config',
     'Update Edge Server configuration. Can enable/disable features, change ports, update printer settings.',
     {
-      config: { type: 'object', description: 'Configuration key-value pairs to update' },
+      config: z.record(z.string(), z.unknown()).describe('Configuration key-value pairs to update'),
     },
     async (params: { config: Record<string, unknown> }) => {
       const result = await client.edgeUpdateConfig(params.config);
@@ -196,7 +197,7 @@ export function registerSystemTools(server: any, client: LabelInnClient) {
     'calibrate_printer',
     'Send calibration command to a thermal printer. Calibrates media sensor, gap detection, and print darkness.',
     {
-      printer_id: { type: 'string', description: 'The printer to calibrate' },
+      printer_id: z.string().describe('The printer to calibrate'),
     },
     async (params: { printer_id: string }) => {
       const result = await client.edgeCalibrateMedia(params.printer_id);
@@ -209,7 +210,7 @@ export function registerSystemTools(server: any, client: LabelInnClient) {
     'test_print',
     'Print a test label on a specific printer. Useful for verifying printer connectivity and print quality.',
     {
-      printer_id: { type: 'string', description: 'The printer to test' },
+      printer_id: z.string().describe('The printer to test'),
     },
     async (params: { printer_id: string }) => {
       const result = await client.edgeTestPrint(params.printer_id);
@@ -222,7 +223,7 @@ export function registerSystemTools(server: any, client: LabelInnClient) {
     'get_printer_config',
     'Get detailed printer configuration: DPI, speed, darkness, media type, label size, firmware version.',
     {
-      printer_id: { type: 'string', description: 'The printer ID' },
+      printer_id: z.string().describe('The printer ID'),
     },
     async (params: { printer_id: string }) => {
       const config = await client.edgePrinterConfig(params.printer_id);
@@ -235,8 +236,8 @@ export function registerSystemTools(server: any, client: LabelInnClient) {
     'update_printer_config',
     'Update printer configuration: speed, darkness, media type, label dimensions, orientation.',
     {
-      printer_id: { type: 'string', description: 'The printer ID' },
-      config: { type: 'object', description: 'Config updates: {darkness: 15, speed: 4, media_type: "gap", label_width_mm: 100, label_height_mm: 60}' },
+      printer_id: z.string().describe('The printer ID'),
+      config: z.record(z.string(), z.unknown()).describe('Config updates: {darkness: 15, speed: 4, media_type: "gap", label_width_mm: 100, label_height_mm: 60}'),
     },
     async (params: { printer_id: string; config: Record<string, unknown> }) => {
       const result = await client.edgeUpdatePrinterConfig(params.printer_id, params.config);

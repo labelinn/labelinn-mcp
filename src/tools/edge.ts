@@ -4,6 +4,7 @@
  * bypassing the cloud entirely. Useful for testing, verification, and real-time ops.
  */
 import { LabelInnClient } from '../utils/api-client.js';
+import { z } from 'zod';
 
 export function registerEdgeTools(server: any, client: LabelInnClient) {
   // ── edge_health ──
@@ -37,10 +38,10 @@ export function registerEdgeTools(server: any, client: LabelInnClient) {
     'edge_print',
     'Print a label through the local Edge Server (LAN, no cloud). Supports ZPL, ESC/POS, and design templates.',
     {
-      printer_id: { type: 'string', description: 'Local printer ID' },
-      payload_type: { type: 'string', description: '"zpl", "escLabel", or "design"' },
-      payload: { type: 'string', description: 'ZPL code, ESC data, or design ID' },
-      copies: { type: 'number', description: 'Number of copies', required: false },
+      printer_id: z.string().describe('Local printer ID'),
+      payload_type: z.string().describe('"zpl", "escLabel", or "design"'),
+      payload: z.string().describe('ZPL code, ESC data, or design ID'),
+      copies: z.number().optional().describe('Number of copies'),
     },
     async (params: { printer_id: string; payload_type: string; payload: string; copies?: number }) => {
       const result = await client.edgePrintJob(params.printer_id, params.payload_type, params.payload, params.copies);
@@ -86,7 +87,7 @@ export function registerEdgeTools(server: any, client: LabelInnClient) {
     'edge_printer_health',
     'Get the health score (0-100) for a specific printer. Factors: supply level, error rate, uptime, latency, queue depth.',
     {
-      printer_id: { type: 'string', description: 'The printer ID' },
+      printer_id: z.string().describe('The printer ID'),
     },
     async (params: { printer_id: string }) => {
       const result = await client.edgePrinterHealth(params.printer_id);
@@ -99,8 +100,8 @@ export function registerEdgeTools(server: any, client: LabelInnClient) {
     'edge_verify_expect',
     'Set expected barcodes for label verification. After printing, scan barcodes to verify they match.',
     {
-      barcodes: { type: 'array', description: 'Array of expected barcode strings' },
-      job_id: { type: 'string', description: 'Associate with a print job ID', required: false },
+      barcodes: z.array(z.unknown()).describe('Array of expected barcode strings'),
+      job_id: z.string().optional().describe('Associate with a print job ID'),
     },
     async (params: { barcodes: string[]; job_id?: string }) => {
       const result = await client.edgeVerifyExpect(params.barcodes, params.job_id);
@@ -113,8 +114,8 @@ export function registerEdgeTools(server: any, client: LabelInnClient) {
     'edge_verify_scan',
     'Submit a scanned barcode for verification against expected values. Returns match/no-match result.',
     {
-      barcode: { type: 'string', description: 'The scanned barcode string' },
-      job_id: { type: 'string', description: 'Job ID to verify against', required: false },
+      barcode: z.string().describe('The scanned barcode string'),
+      job_id: z.string().optional().describe('Job ID to verify against'),
     },
     async (params: { barcode: string; job_id?: string }) => {
       const result = await client.edgeVerifyScan(params.barcode, params.job_id);
@@ -138,7 +139,7 @@ export function registerEdgeTools(server: any, client: LabelInnClient) {
     'edge_verify_audit',
     'Get the verification audit log — every scan result with timestamps, match status, operator info.',
     {
-      limit: { type: 'number', description: 'Max entries to return', required: false },
+      limit: z.number().optional().describe('Max entries to return'),
     },
     async (params: { limit?: number }) => {
       const result = await client.edgeVerifyAudit(params.limit);
@@ -162,8 +163,8 @@ export function registerEdgeTools(server: any, client: LabelInnClient) {
     'edge_rules_evaluate',
     'Dry-run evaluate rules on the Edge Server. Test how rules would fire for a given context without actually executing actions.',
     {
-      trigger: { type: 'string', description: 'Trigger type: "printJobCreated", "printerStatusChanged", etc.' },
-      context: { type: 'object', description: 'Context data: {"job.copies": 10, "printer.type": "ZEBRA", "data.weight_kg": 15}' },
+      trigger: z.string().describe('Trigger type: "printJobCreated", "printerStatusChanged", etc.'),
+      context: z.record(z.string(), z.unknown()).describe('Context data: {"job.copies": 10, "printer.type": "ZEBRA", "data.weight_kg": 15}'),
     },
     async (params: { trigger: string; context: Record<string, unknown> }) => {
       const result = await client.edgeRulesEvaluate(params.trigger, params.context);
@@ -176,8 +177,8 @@ export function registerEdgeTools(server: any, client: LabelInnClient) {
     'edge_audit',
     'Get recent audit events from the Edge Server\'s local audit log.',
     {
-      limit: { type: 'number', description: 'Max entries', required: false },
-      action: { type: 'string', description: 'Filter by action type', required: false },
+      limit: z.number().optional().describe('Max entries'),
+      action: z.string().optional().describe('Filter by action type'),
     },
     async (params: { limit?: number; action?: string }) => {
       const result = await client.edgeAuditRecent(params.limit, params.action);

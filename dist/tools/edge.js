@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerEdgeTools = registerEdgeTools;
+const zod_1 = require("zod");
 function registerEdgeTools(server, client) {
     // ── edge_health ──
     server.tool('edge_health', 'Check if the local Edge Server is running. Returns server status, version, mode, uptime.', {}, async () => {
@@ -19,10 +20,10 @@ function registerEdgeTools(server, client) {
     });
     // ── edge_print ──
     server.tool('edge_print', 'Print a label through the local Edge Server (LAN, no cloud). Supports ZPL, ESC/POS, and design templates.', {
-        printer_id: { type: 'string', description: 'Local printer ID' },
-        payload_type: { type: 'string', description: '"zpl", "escLabel", or "design"' },
-        payload: { type: 'string', description: 'ZPL code, ESC data, or design ID' },
-        copies: { type: 'number', description: 'Number of copies', required: false },
+        printer_id: zod_1.z.string().describe('Local printer ID'),
+        payload_type: zod_1.z.string().describe('"zpl", "escLabel", or "design"'),
+        payload: zod_1.z.string().describe('ZPL code, ESC data, or design ID'),
+        copies: zod_1.z.number().optional().describe('Number of copies'),
     }, async (params) => {
         const result = await client.edgePrintJob(params.printer_id, params.payload_type, params.payload, params.copies);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
@@ -44,23 +45,23 @@ function registerEdgeTools(server, client) {
     });
     // ── edge_printer_health ──
     server.tool('edge_printer_health', 'Get the health score (0-100) for a specific printer. Factors: supply level, error rate, uptime, latency, queue depth.', {
-        printer_id: { type: 'string', description: 'The printer ID' },
+        printer_id: zod_1.z.string().describe('The printer ID'),
     }, async (params) => {
         const result = await client.edgePrinterHealth(params.printer_id);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     });
     // ── edge_verify_expect ──
     server.tool('edge_verify_expect', 'Set expected barcodes for label verification. After printing, scan barcodes to verify they match.', {
-        barcodes: { type: 'array', description: 'Array of expected barcode strings' },
-        job_id: { type: 'string', description: 'Associate with a print job ID', required: false },
+        barcodes: zod_1.z.array(zod_1.z.unknown()).describe('Array of expected barcode strings'),
+        job_id: zod_1.z.string().optional().describe('Associate with a print job ID'),
     }, async (params) => {
         const result = await client.edgeVerifyExpect(params.barcodes, params.job_id);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     });
     // ── edge_verify_scan ──
     server.tool('edge_verify_scan', 'Submit a scanned barcode for verification against expected values. Returns match/no-match result.', {
-        barcode: { type: 'string', description: 'The scanned barcode string' },
-        job_id: { type: 'string', description: 'Job ID to verify against', required: false },
+        barcode: zod_1.z.string().describe('The scanned barcode string'),
+        job_id: zod_1.z.string().optional().describe('Job ID to verify against'),
     }, async (params) => {
         const result = await client.edgeVerifyScan(params.barcode, params.job_id);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
@@ -72,7 +73,7 @@ function registerEdgeTools(server, client) {
     });
     // ── edge_verify_audit ──
     server.tool('edge_verify_audit', 'Get the verification audit log — every scan result with timestamps, match status, operator info.', {
-        limit: { type: 'number', description: 'Max entries to return', required: false },
+        limit: zod_1.z.number().optional().describe('Max entries to return'),
     }, async (params) => {
         const result = await client.edgeVerifyAudit(params.limit);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
@@ -84,16 +85,16 @@ function registerEdgeTools(server, client) {
     });
     // ── edge_rules_evaluate ──
     server.tool('edge_rules_evaluate', 'Dry-run evaluate rules on the Edge Server. Test how rules would fire for a given context without actually executing actions.', {
-        trigger: { type: 'string', description: 'Trigger type: "printJobCreated", "printerStatusChanged", etc.' },
-        context: { type: 'object', description: 'Context data: {"job.copies": 10, "printer.type": "ZEBRA", "data.weight_kg": 15}' },
+        trigger: zod_1.z.string().describe('Trigger type: "printJobCreated", "printerStatusChanged", etc.'),
+        context: zod_1.z.record(zod_1.z.string(), zod_1.z.unknown()).describe('Context data: {"job.copies": 10, "printer.type": "ZEBRA", "data.weight_kg": 15}'),
     }, async (params) => {
         const result = await client.edgeRulesEvaluate(params.trigger, params.context);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     });
     // ── edge_audit ──
     server.tool('edge_audit', 'Get recent audit events from the Edge Server\'s local audit log.', {
-        limit: { type: 'number', description: 'Max entries', required: false },
-        action: { type: 'string', description: 'Filter by action type', required: false },
+        limit: zod_1.z.number().optional().describe('Max entries'),
+        action: zod_1.z.string().optional().describe('Filter by action type'),
     }, async (params) => {
         const result = await client.edgeAuditRecent(params.limit, params.action);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };

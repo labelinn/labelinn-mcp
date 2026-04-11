@@ -1,20 +1,21 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerConnectTools = registerConnectTools;
+const zod_1 = require("zod");
 function registerConnectTools(server, client) {
     // ── ingest_data ──
     server.tool('ingest_data', 'Ingest data from external sources (CSV, Excel, JSON, XML, API). Data is parsed and can be used for variable-driven label printing.', {
-        source_type: { type: 'string', description: '"csv", "json", "xml", "excel", "api"' },
-        data: { type: 'string', description: 'Raw data content or API URL' },
-        mapping: { type: 'object', description: 'Field mapping: {"sku": "column_A", "name": "column_B"}', required: false },
+        source_type: zod_1.z.string().describe('"csv", "json", "xml", "excel", "api"'),
+        data: zod_1.z.string().describe('Raw data content or API URL'),
+        mapping: zod_1.z.record(zod_1.z.string(), zod_1.z.unknown()).optional().describe('Field mapping: {"sku": "column_A", "name": "column_B"}'),
     }, async (params) => {
         const result = await client.ingestData(params.data, params.source_type, params.mapping ? JSON.stringify(params.mapping) : undefined);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     });
     // ── test_parse ──
     server.tool('test_parse', 'Test-parse data to preview how it would be interpreted. Returns parsed rows without saving.', {
-        source_type: { type: 'string', description: '"csv", "json", "xml", "excel"' },
-        data: { type: 'string', description: 'Raw data content to parse' },
+        source_type: zod_1.z.string().describe('"csv", "json", "xml", "excel"'),
+        data: zod_1.z.string().describe('Raw data content to parse'),
     }, async (params) => {
         const result = await client.testParse(params.data, params.source_type);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
@@ -26,20 +27,20 @@ function registerConnectTools(server, client) {
     });
     // ── print_from_connector ──
     server.tool('print_from_connector', 'Print labels directly from a connected data source. Combines data ingestion + batch print in one step.', {
-        source_id: { type: 'string', description: 'The data source ID' },
-        design_id: { type: 'string', description: 'Design template to use' },
-        printer_id: { type: 'string', description: 'Target printer' },
-        filter: { type: 'object', description: 'Row filter criteria', required: false },
+        source_id: zod_1.z.string().describe('The data source ID'),
+        design_id: zod_1.z.string().describe('Design template to use'),
+        printer_id: zod_1.z.string().describe('Target printer'),
+        filter: zod_1.z.record(zod_1.z.string(), zod_1.z.unknown()).optional().describe('Row filter criteria'),
     }, async (params) => {
         const result = await client.printFromConnector(params.source_id, params.design_id, params.printer_id);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     });
     // ── batch_print ──
     server.tool('batch_print', 'Batch print multiple labels with variable data. Provide an array of data rows — each row produces one label.', {
-        design_id: { type: 'string', description: 'Design template ID' },
-        printer_id: { type: 'string', description: 'Target printer ID' },
-        rows: { type: 'array', description: 'Array of data objects, each with variable values: [{"product_name":"Widget","sku":"SKU001"}, ...]' },
-        copies_per_row: { type: 'number', description: 'Copies per label row (default 1)', required: false },
+        design_id: zod_1.z.string().describe('Design template ID'),
+        printer_id: zod_1.z.string().describe('Target printer ID'),
+        rows: zod_1.z.array(zod_1.z.unknown()).describe('Array of data objects, each with variable values: [{"product_name":"Widget","sku":"SKU001"}, ...]'),
+        copies_per_row: zod_1.z.number().optional().describe('Copies per label row (default 1)'),
     }, async (params) => {
         const result = await client.printDesign(params.design_id, params.printer_id, { rows: params.rows }, params.copies_per_row);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };

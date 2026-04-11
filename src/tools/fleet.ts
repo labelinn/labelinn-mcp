@@ -2,6 +2,7 @@
  * Fleet management MCP tools
  */
 import { LabelInnClient } from '../utils/api-client.js';
+import { z } from 'zod';
 
 export function registerFleetTools(server: any, client: LabelInnClient) {
   // ── list_printers ──
@@ -9,7 +10,7 @@ export function registerFleetTools(server: any, client: LabelInnClient) {
     'list_printers',
     'List all registered thermal printers in the fleet. Shows name, status (online/offline), type, and connection info.',
     {
-      status: { type: 'string', description: 'Filter by status: "online" or "offline"', required: false },
+      status: z.string().optional().describe('Filter by status: "online" or "offline"'),
     },
     async (params: { status?: string }) => {
       const printers = await client.listPrinters(params.status);
@@ -22,7 +23,7 @@ export function registerFleetTools(server: any, client: LabelInnClient) {
     'get_printer_status',
     'Get the live status of a specific printer including online/offline state, supply levels, and last seen time.',
     {
-      printer_id: { type: 'string', description: 'The printer ID to check' },
+      printer_id: z.string().describe('The printer ID to check'),
     },
     async (params: { printer_id: string }) => {
       const status = await client.getPrinterStatus(params.printer_id);
@@ -35,7 +36,7 @@ export function registerFleetTools(server: any, client: LabelInnClient) {
     'get_printer_details',
     'Get full details of a printer including telemetry, media configuration, supply levels, and print history stats.',
     {
-      printer_id: { type: 'string', description: 'The printer ID' },
+      printer_id: z.string().describe('The printer ID'),
     },
     async (params: { printer_id: string }) => {
       const printer = await client.getPrinter(params.printer_id);
@@ -59,7 +60,7 @@ export function registerFleetTools(server: any, client: LabelInnClient) {
     'get_discovery_results',
     'Get results from a printer discovery session. Use after discover_printers.',
     {
-      session_id: { type: 'string', description: 'Discovery session ID from discover_printers' },
+      session_id: z.string().describe('Discovery session ID from discover_printers'),
     },
     async (params: { session_id: string }) => {
       const result = await client.getDiscoveryResults(params.session_id);
@@ -72,8 +73,8 @@ export function registerFleetTools(server: any, client: LabelInnClient) {
     'add_discovered_printer',
     'Add a printer found during discovery to the fleet.',
     {
-      session_id: { type: 'string', description: 'Discovery session ID' },
-      printer_address: { type: 'string', description: 'Address of the printer to add (IP or USB path)' },
+      session_id: z.string().describe('Discovery session ID'),
+      printer_address: z.string().describe('Address of the printer to add (IP or USB path)'),
     },
     async (params: { session_id: string; printer_address: string }) => {
       const result = await client.addDiscoveredPrinter(params.session_id, params.printer_address);
@@ -86,9 +87,9 @@ export function registerFleetTools(server: any, client: LabelInnClient) {
     'update_printer',
     'Update a printer\'s display name, metadata, or other settings.',
     {
-      printer_id: { type: 'string', description: 'The printer ID' },
-      display_name: { type: 'string', description: 'New display name', required: false },
-      metadata: { type: 'object', description: 'Custom metadata key-value pairs', required: false },
+      printer_id: z.string().describe('The printer ID'),
+      display_name: z.string().optional().describe('New display name'),
+      metadata: z.record(z.string(), z.unknown()).optional().describe('Custom metadata key-value pairs'),
     },
     async (params: { printer_id: string; display_name?: string; metadata?: Record<string, unknown> }) => {
       const data: Record<string, unknown> = {};
@@ -104,7 +105,7 @@ export function registerFleetTools(server: any, client: LabelInnClient) {
     'identify_printer',
     'Flash the LEDs on a printer to physically identify it. Useful when multiple printers are nearby.',
     {
-      printer_id: { type: 'string', description: 'The printer ID to identify' },
+      printer_id: z.string().describe('The printer ID to identify'),
     },
     async (params: { printer_id: string }) => {
       const result = await client.identifyPrinter(params.printer_id);
@@ -117,13 +118,13 @@ export function registerFleetTools(server: any, client: LabelInnClient) {
     'set_printer_media',
     'Configure the media (label size, type, darkness, speed) on a printer. This calibrates the printer for specific label stock.',
     {
-      printer_id: { type: 'string', description: 'The printer ID' },
-      width_mm: { type: 'number', description: 'Label width in mm' },
-      height_mm: { type: 'number', description: 'Label height in mm' },
-      media_type: { type: 'string', description: '"gap", "continuous", or "mark"', required: false },
-      gap_mm: { type: 'number', description: 'Gap between labels in mm', required: false },
-      darkness: { type: 'number', description: 'Print darkness 0-30', required: false },
-      speed: { type: 'number', description: 'Print speed', required: false },
+      printer_id: z.string().describe('The printer ID'),
+      width_mm: z.number().describe('Label width in mm'),
+      height_mm: z.number().describe('Label height in mm'),
+      media_type: z.string().optional().describe('"gap", "continuous", or "mark"'),
+      gap_mm: z.number().optional().describe('Gap between labels in mm'),
+      darkness: z.number().optional().describe('Print darkness 0-30'),
+      speed: z.number().optional().describe('Print speed'),
     },
     async (params: { printer_id: string; width_mm: number; height_mm: number; media_type?: string; gap_mm?: number; darkness?: number; speed?: number }) => {
       const media: Record<string, unknown> = { width_mm: params.width_mm, height_mm: params.height_mm };
@@ -141,9 +142,9 @@ export function registerFleetTools(server: any, client: LabelInnClient) {
     'create_printer_group',
     'Create a group of printers for load balancing, failover, or organizational purposes.',
     {
-      name: { type: 'string', description: 'Group name (e.g., "Warehouse A Printers")' },
-      printer_ids: { type: 'array', description: 'Array of printer IDs to include' },
-      description: { type: 'string', description: 'Group description', required: false },
+      name: z.string().describe('Group name (e.g., "Warehouse A Printers")'),
+      printer_ids: z.array(z.unknown()).describe('Array of printer IDs to include'),
+      description: z.string().optional().describe('Group description'),
     },
     async (params: { name: string; printer_ids: string[]; description?: string }) => {
       const result = await client.createPrinterGroup(params.name, params.printer_ids, params.description);

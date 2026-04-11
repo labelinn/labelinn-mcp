@@ -6,83 +6,243 @@
  * Model Context Protocol server for AI assistants to interact with
  * LabelInn's cloud printing infrastructure + local Edge Server.
  *
- * 90+ Tools across 11 categories:
- *   Print:     print_label, print_zpl, print_image
- *   Fleet:     list_printers, get_printer_status, get_printer_details,
- *              discover_printers, add_discovered_printer, update_printer,
- *              identify_printer, set_printer_media, create/list_printer_groups
- *   Designs:   list/get/create/update/delete_design, get_design_variables,
- *              clone_design, add/update/delete_element, render_design_preview
- *   Jobs:      list/get/cancel/reprint_job
- *   Rules:     create/list/get/update/delete/test_rule
- *   Audit:     audit_trail, audit_summary, serial_pools, webhooks
- *   Edge:      14 local Edge Server tools (health, print, verify, discover, etc.)
- *   Sites:     create/list/get_site, assign_printers, nearest_site, analytics
- *   Connect:   ingest_data, test_parse, batch_print, print_from_connector
- *   System:    system_health_check, restart_edge, get_logs, usb_devices, diagnostics
- *   Testing:   skynet_start_session, run_test, record_fix, get_status, end_session
+ * Supports two transport modes:
+ *   1. stdio  — Local CLI usage (Claude Desktop, VS Code Copilot, Cursor)
+ *   2. http   — Remote/hosted Streamable HTTP (Firebase, any cloud)
  *
- * 10 Resources:
- *   labelinn://printers, labelinn://designs, labelinn://usage,
- *   labelinn://jobs/recent, labelinn://fleet/health, labelinn://rules,
- *   labelinn://audit/summary, labelinn://sites, labelinn://edge/status
+ * 112 Tools across 13 categories:
+ *   Print, Fleet, Designs, Jobs, Rules, Audit, Edge, Sites,
+ *   Connect, System, Testing, Render, Context
  *
  * Usage:
+ *   # stdio mode (default — for local MCP clients)
  *   LABELINN_API_KEY=sk_live_xxx npx @labelinn/mcp-server
+ *
+ *   # http mode (for remote/cloud hosting)
+ *   LABELINN_API_KEY=sk_live_xxx npx @labelinn/mcp-server --http --port 3001
+ *
+ * Environment Variables:
+ *   LABELINN_API_KEY       — Default API key (required for stdio, optional for http)
+ *   LABELINN_BASE_URL      — API base URL (default: https://labelinn.com/v1)
+ *   LABELINN_CORS_ORIGIN   — CORS origin (default: * in dev, https://labelinn.com in prod)
+ *   LABELINN_RATE_LIMIT    — Requests per minute per IP (default: 60)
+ *   LABELINN_MAX_BODY_SIZE — Max request body in bytes (default: 1048576 = 1MB)
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-const mcp_js_1 = require("@modelcontextprotocol/sdk/server/mcp.js");
+exports.handleMcpRequest = exports.createMcpServer = void 0;
 const stdio_js_1 = require("@modelcontextprotocol/sdk/server/stdio.js");
-const api_client_js_1 = require("./utils/api-client.js");
-const print_js_1 = require("./tools/print.js");
-const fleet_js_1 = require("./tools/fleet.js");
-const designs_js_1 = require("./tools/designs.js");
-const jobs_js_1 = require("./tools/jobs.js");
-const rules_js_1 = require("./tools/rules.js");
-const audit_js_1 = require("./tools/audit.js");
-const edge_js_1 = require("./tools/edge.js");
-const sites_js_1 = require("./tools/sites.js");
-const connect_js_1 = require("./tools/connect.js");
-const system_js_1 = require("./tools/system.js");
-const testing_js_1 = require("./tools/testing.js");
-const render_js_1 = require("./tools/render.js");
-const context_js_1 = require("./tools/context.js");
-const index_js_1 = require("./resources/index.js");
-async function main() {
-    // ── Config ──
-    const apiKey = process.env.LABELINN_API_KEY;
-    if (!apiKey) {
-        console.error('Error: LABELINN_API_KEY environment variable is required.');
-        console.error('Set it to your LabelInn API key (sk_live_xxx or sk_test_xxx).');
-        process.exit(1);
+const streamableHttp_js_1 = require("@modelcontextprotocol/sdk/server/streamableHttp.js");
+const node_http_1 = require("node:http");
+const server_js_1 = require("./server.js");
+// Re-export for Firebase / external consumers
+var server_js_2 = require("./server.js");
+Object.defineProperty(exports, "createMcpServer", { enumerable: true, get: function () { return server_js_2.createMcpServer; } });
+var handler_js_1 = require("./handler.js");
+Object.defineProperty(exports, "handleMcpRequest", { enumerable: true, get: function () { return handler_js_1.handleMcpRequest; } });
+// ── Rate Limiter (in-memory sliding window) ──
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
+function isRateLimited(ip, maxRequests) {
+    const now = Date.now();
+    const entry = rateLimitMap.get(ip);
+    if (!entry || now > entry.resetAt) {
+        rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+        return false;
     }
-    const baseUrl = process.env.LABELINN_BASE_URL || 'https://labelinn.com/v1';
-    const client = new api_client_js_1.LabelInnClient(apiKey, baseUrl);
-    // ── Server ──
-    const server = new mcp_js_1.McpServer({
-        name: 'labelinn',
-        version: '2.0.0',
-        description: 'LabelInn Full API + SKYNET Autonomous Testing — 90+ tools for cloud printing, fleet management, design editing, rules engine, compliance audit, label verification, Edge Server local ops, sites & geo-routing, analytics & predictions, batch printing, system diagnostics, and autonomous self-healing test sessions. Controls Zebra, TSC, Honeywell, Epson, Brother thermal printers.',
+    entry.count++;
+    return entry.count > maxRequests;
+}
+// Cleanup stale entries every 5 minutes
+setInterval(() => {
+    const now = Date.now();
+    for (const [ip, entry] of rateLimitMap) {
+        if (now > entry.resetAt)
+            rateLimitMap.delete(ip);
+    }
+}, 300_000).unref();
+// ── Request body reader with size limit ──
+function readBody(req, maxBytes) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        let size = 0;
+        req.on('data', (chunk) => {
+            size += chunk.length;
+            if (size > maxBytes) {
+                req.destroy();
+                reject(new Error('Request body too large'));
+            }
+            else {
+                chunks.push(chunk);
+            }
+        });
+        req.on('end', () => resolve(Buffer.concat(chunks)));
+        req.on('error', reject);
     });
-    // ── Register Tools ──
-    (0, print_js_1.registerPrintTools)(server, client);
-    (0, fleet_js_1.registerFleetTools)(server, client);
-    (0, designs_js_1.registerDesignTools)(server, client);
-    (0, jobs_js_1.registerJobTools)(server, client);
-    (0, rules_js_1.registerRulesTools)(server, client);
-    (0, audit_js_1.registerAuditTools)(server, client);
-    (0, edge_js_1.registerEdgeTools)(server, client);
-    (0, sites_js_1.registerSitesTools)(server, client);
-    (0, connect_js_1.registerConnectTools)(server, client);
-    (0, system_js_1.registerSystemTools)(server, client);
-    (0, testing_js_1.registerTestingTools)(server, client);
-    (0, render_js_1.registerRenderTools)(server, client);
-    (0, context_js_1.registerContextTools)(server, client);
-    // ── Register Resources ──
-    (0, index_js_1.registerResources)(server, client);
-    // ── Start ──
-    const transport = new stdio_js_1.StdioServerTransport();
-    await server.connect(transport);
+}
+// ── Extract client IP ──
+function getClientIp(req) {
+    const forwarded = req.headers['x-forwarded-for'];
+    if (typeof forwarded === 'string')
+        return forwarded.split(',')[0].trim();
+    return req.socket.remoteAddress || 'unknown';
+}
+// ── Extract API key from Authorization header or env ──
+function extractApiKey(req, fallbackKey) {
+    const auth = req.headers.authorization;
+    if (auth && auth.startsWith('Bearer ')) {
+        const key = auth.substring(7).trim();
+        if (key.startsWith('sk_live_') || key.startsWith('sk_test_'))
+            return key;
+    }
+    return fallbackKey || null;
+}
+// ── Security headers ──
+function setSecurityHeaders(res) {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '0');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains');
+}
+// ── JSON error response ──
+function jsonError(res, status, code, message) {
+    res.writeHead(status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ jsonrpc: '2.0', error: { code, message }, id: null }));
+}
+async function main() {
+    const args = process.argv.slice(2);
+    const isHttpMode = args.includes('--http') || args.includes('--sse');
+    const portArg = args.find((_, i) => args[i - 1] === '--port');
+    const port = portArg ? parseInt(portArg, 10) : 3001;
+    const envApiKey = process.env.LABELINN_API_KEY;
+    const baseUrl = process.env.LABELINN_BASE_URL || 'https://labelinn.com/v1';
+    const corsOrigin = process.env.LABELINN_CORS_ORIGIN || '*';
+    const rateLimit = parseInt(process.env.LABELINN_RATE_LIMIT || '60', 10);
+    const maxBodySize = parseInt(process.env.LABELINN_MAX_BODY_SIZE || '1048576', 10);
+    if (isHttpMode) {
+        // ── HTTP / Streamable HTTP Mode ──
+        const httpServer = (0, node_http_1.createServer)(async (req, res) => {
+            // Security headers on every response
+            setSecurityHeaders(res);
+            // CORS
+            res.setHeader('Access-Control-Allow-Origin', corsOrigin);
+            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Mcp-Session-Id');
+            res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id');
+            if (req.method === 'OPTIONS') {
+                res.writeHead(204).end();
+                return;
+            }
+            // Rate limiting
+            const clientIp = getClientIp(req);
+            if (isRateLimited(clientIp, rateLimit)) {
+                res.setHeader('Retry-After', '60');
+                jsonError(res, 429, -32000, 'Rate limit exceeded. Try again later.');
+                return;
+            }
+            // Health check
+            if (req.method === 'GET' && (req.url === '/' || req.url === '/health')) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    status: 'ok',
+                    server: 'labelinn-mcp',
+                    version: '2.0.0',
+                    transport: 'streamable-http',
+                    tools: 112,
+                }));
+                return;
+            }
+            // MCP endpoint
+            if (req.url === '/mcp') {
+                if (req.method !== 'POST') {
+                    jsonError(res, 405, -32000, 'Method not allowed. Use POST for MCP requests.');
+                    return;
+                }
+                // Auth — per-request API key from header, with env var as fallback
+                const apiKey = extractApiKey(req, envApiKey);
+                if (!apiKey) {
+                    jsonError(res, 401, -32001, 'Missing API key. Set Authorization: Bearer sk_live_xxx header or LABELINN_API_KEY env var.');
+                    return;
+                }
+                // Request body size limit
+                let body;
+                try {
+                    body = await readBody(req, maxBodySize);
+                }
+                catch {
+                    jsonError(res, 413, -32000, `Request body too large. Max ${maxBodySize} bytes.`);
+                    return;
+                }
+                // Validate JSON
+                let parsed;
+                try {
+                    parsed = JSON.parse(body.toString('utf-8'));
+                }
+                catch {
+                    jsonError(res, 400, -32700, 'Parse error: invalid JSON.');
+                    return;
+                }
+                // Request timeout (30s)
+                const timeout = setTimeout(() => {
+                    if (!res.writableEnded) {
+                        jsonError(res, 504, -32000, 'Request timeout.');
+                    }
+                }, 30_000);
+                try {
+                    const { server } = (0, server_js_1.createMcpServer)(apiKey, baseUrl);
+                    const transport = new streamableHttp_js_1.StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+                    await server.connect(transport);
+                    // Attach the parsed body so the transport can read it
+                    req.body = parsed;
+                    await transport.handleRequest(req, res, parsed);
+                    res.on('close', () => {
+                        clearTimeout(timeout);
+                        transport.close();
+                        server.close();
+                    });
+                }
+                catch (err) {
+                    clearTimeout(timeout);
+                    console.error('[MCP] Error:', err);
+                    if (!res.headersSent) {
+                        jsonError(res, 500, -32603, 'Internal server error.');
+                    }
+                }
+                return;
+            }
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Not Found' }));
+        });
+        // Graceful shutdown
+        const shutdown = () => {
+            console.log('\n🛑 Shutting down MCP server...');
+            httpServer.close(() => process.exit(0));
+            setTimeout(() => process.exit(1), 5000).unref();
+        };
+        process.on('SIGTERM', shutdown);
+        process.on('SIGINT', shutdown);
+        httpServer.listen(port, '0.0.0.0', () => {
+            console.log(`🖨️  LabelInn MCP Server v2.0.0 (Streamable HTTP)`);
+            console.log(`   Endpoint:    http://0.0.0.0:${port}/mcp`);
+            console.log(`   Health:      http://0.0.0.0:${port}/health`);
+            console.log(`   CORS:        ${corsOrigin}`);
+            console.log(`   Rate limit:  ${rateLimit} req/min`);
+            console.log(`   Max body:    ${(maxBodySize / 1024).toFixed(0)} KB`);
+            console.log(`   Auth:        ${envApiKey ? 'env + header' : 'header only'}`);
+        });
+    }
+    else {
+        // ── Stdio Mode (default) ──
+        if (!envApiKey) {
+            console.error('Error: LABELINN_API_KEY environment variable is required.');
+            console.error('Set it to your LabelInn API key (sk_live_xxx or sk_test_xxx).');
+            process.exit(1);
+        }
+        const { server } = (0, server_js_1.createMcpServer)(envApiKey, baseUrl);
+        const transport = new stdio_js_1.StdioServerTransport();
+        await server.connect(transport);
+    }
 }
 main().catch((err) => {
     console.error('Fatal error:', err);

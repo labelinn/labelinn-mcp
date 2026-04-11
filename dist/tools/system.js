@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerSystemTools = registerSystemTools;
 const child_process_1 = require("child_process");
 const os = __importStar(require("os"));
+const zod_1 = require("zod");
 function registerSystemTools(server, client) {
     // ── system_health_check ──
     server.tool('system_health_check', 'Comprehensive health check: Edge Server, Cloud API, printers, scanner, network. Returns a full status report. Run this FIRST in any test session.', {}, async () => {
@@ -104,7 +105,7 @@ function registerSystemTools(server, client) {
     });
     // ── restart_edge_server ──
     server.tool('restart_edge_server', 'Restart the Edge Server. Use this after applying code fixes or when the server is unresponsive.', {
-        reason: { type: 'string', description: 'Why you are restarting (for audit trail)' },
+        reason: zod_1.z.string().describe('Why you are restarting (for audit trail)'),
     }, async (params) => {
         try {
             const result = await client.edgeRestart();
@@ -117,8 +118,8 @@ function registerSystemTools(server, client) {
     });
     // ── get_edge_logs ──
     server.tool('get_edge_logs', 'Get recent Edge Server logs. Use this to diagnose failures after a test fails.', {
-        limit: { type: 'number', description: 'Number of log entries (default 50)', required: false },
-        level: { type: 'string', description: 'Filter by level: "error", "warning", "info", "debug"', required: false },
+        limit: zod_1.z.number().optional().describe('Number of log entries (default 50)'),
+        level: zod_1.z.string().optional().describe('Filter by level: "error", "warning", "info", "debug"'),
     }, async (params) => {
         try {
             const logs = await client.edgeLogs(params.limit || 50, params.level);
@@ -180,36 +181,36 @@ function registerSystemTools(server, client) {
     });
     // ── update_edge_config ──
     server.tool('update_edge_config', 'Update Edge Server configuration. Can enable/disable features, change ports, update printer settings.', {
-        config: { type: 'object', description: 'Configuration key-value pairs to update' },
+        config: zod_1.z.record(zod_1.z.string(), zod_1.z.unknown()).describe('Configuration key-value pairs to update'),
     }, async (params) => {
         const result = await client.edgeUpdateConfig(params.config);
         return { content: [{ type: 'text', text: `Config updated.\n${JSON.stringify(result, null, 2)}` }] };
     });
     // ── calibrate_printer ──
     server.tool('calibrate_printer', 'Send calibration command to a thermal printer. Calibrates media sensor, gap detection, and print darkness.', {
-        printer_id: { type: 'string', description: 'The printer to calibrate' },
+        printer_id: zod_1.z.string().describe('The printer to calibrate'),
     }, async (params) => {
         const result = await client.edgeCalibrateMedia(params.printer_id);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     });
     // ── test_print ──
     server.tool('test_print', 'Print a test label on a specific printer. Useful for verifying printer connectivity and print quality.', {
-        printer_id: { type: 'string', description: 'The printer to test' },
+        printer_id: zod_1.z.string().describe('The printer to test'),
     }, async (params) => {
         const result = await client.edgeTestPrint(params.printer_id);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     });
     // ── get_printer_config ──
     server.tool('get_printer_config', 'Get detailed printer configuration: DPI, speed, darkness, media type, label size, firmware version.', {
-        printer_id: { type: 'string', description: 'The printer ID' },
+        printer_id: zod_1.z.string().describe('The printer ID'),
     }, async (params) => {
         const config = await client.edgePrinterConfig(params.printer_id);
         return { content: [{ type: 'text', text: JSON.stringify(config, null, 2) }] };
     });
     // ── update_printer_config ──
     server.tool('update_printer_config', 'Update printer configuration: speed, darkness, media type, label dimensions, orientation.', {
-        printer_id: { type: 'string', description: 'The printer ID' },
-        config: { type: 'object', description: 'Config updates: {darkness: 15, speed: 4, media_type: "gap", label_width_mm: 100, label_height_mm: 60}' },
+        printer_id: zod_1.z.string().describe('The printer ID'),
+        config: zod_1.z.record(zod_1.z.string(), zod_1.z.unknown()).describe('Config updates: {darkness: 15, speed: 4, media_type: "gap", label_width_mm: 100, label_height_mm: 60}'),
     }, async (params) => {
         const result = await client.edgeUpdatePrinterConfig(params.printer_id, params.config);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };

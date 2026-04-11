@@ -5,28 +5,27 @@
  * Model Context Protocol server for AI assistants to interact with
  * LabelInn's cloud printing infrastructure + local Edge Server.
  *
- * 90+ Tools across 11 categories:
- *   Print:     print_label, print_zpl, print_image
- *   Fleet:     list_printers, get_printer_status, get_printer_details,
- *              discover_printers, add_discovered_printer, update_printer,
- *              identify_printer, set_printer_media, create/list_printer_groups
- *   Designs:   list/get/create/update/delete_design, get_design_variables,
- *              clone_design, add/update/delete_element, render_design_preview
- *   Jobs:      list/get/cancel/reprint_job
- *   Rules:     create/list/get/update/delete/test_rule
- *   Audit:     audit_trail, audit_summary, serial_pools, webhooks
- *   Edge:      14 local Edge Server tools (health, print, verify, discover, etc.)
- *   Sites:     create/list/get_site, assign_printers, nearest_site, analytics
- *   Connect:   ingest_data, test_parse, batch_print, print_from_connector
- *   System:    system_health_check, restart_edge, get_logs, usb_devices, diagnostics
- *   Testing:   skynet_start_session, run_test, record_fix, get_status, end_session
+ * Supports two transport modes:
+ *   1. stdio  — Local CLI usage (Claude Desktop, VS Code Copilot, Cursor)
+ *   2. http   — Remote/hosted Streamable HTTP (Firebase, any cloud)
  *
- * 10 Resources:
- *   labelinn://printers, labelinn://designs, labelinn://usage,
- *   labelinn://jobs/recent, labelinn://fleet/health, labelinn://rules,
- *   labelinn://audit/summary, labelinn://sites, labelinn://edge/status
+ * 112 Tools across 13 categories:
+ *   Print, Fleet, Designs, Jobs, Rules, Audit, Edge, Sites,
+ *   Connect, System, Testing, Render, Context
  *
  * Usage:
+ *   # stdio mode (default — for local MCP clients)
  *   LABELINN_API_KEY=sk_live_xxx npx @labelinn/mcp-server
+ *
+ *   # http mode (for remote/cloud hosting)
+ *   LABELINN_API_KEY=sk_live_xxx npx @labelinn/mcp-server --http --port 3001
+ *
+ * Environment Variables:
+ *   LABELINN_API_KEY       — Default API key (required for stdio, optional for http)
+ *   LABELINN_BASE_URL      — API base URL (default: https://labelinn.com/v1)
+ *   LABELINN_CORS_ORIGIN   — CORS origin (default: * in dev, https://labelinn.com in prod)
+ *   LABELINN_RATE_LIMIT    — Requests per minute per IP (default: 60)
+ *   LABELINN_MAX_BODY_SIZE — Max request body in bytes (default: 1048576 = 1MB)
  */
-export {};
+export { createMcpServer } from './server.js';
+export { handleMcpRequest } from './handler.js';

@@ -2,6 +2,7 @@
  * Audit Trail & Compliance MCP tools
  */
 import { LabelInnClient } from '../utils/api-client.js';
+import { z } from 'zod';
 
 export function registerAuditTools(server: any, client: LabelInnClient) {
   // ── get_audit_trail ──
@@ -9,10 +10,10 @@ export function registerAuditTools(server: any, client: LabelInnClient) {
     'get_audit_trail',
     'Query the audit trail — who did what, when. Filter by action type, date range. Essential for compliance (FDA, GS1, etc.).',
     {
-      action: { type: 'string', description: 'Filter by action: "print", "cancel", "reprint", "verify", "modify"', required: false },
-      limit: { type: 'number', description: 'Max entries (1-200)', required: false },
-      date_from: { type: 'string', description: 'Start date (ISO 8601)', required: false },
-      date_to: { type: 'string', description: 'End date (ISO 8601)', required: false },
+      action: z.string().optional().describe('Filter by action: "print", "cancel", "reprint", "verify", "modify"'),
+      limit: z.number().optional().describe('Max entries (1-200)'),
+      date_from: z.string().optional().describe('Start date (ISO 8601)'),
+      date_to: z.string().optional().describe('End date (ISO 8601)'),
     },
     async (params: { action?: string; limit?: number; date_from?: string; date_to?: string }) => {
       const result = await client.getAuditTrail(params);
@@ -36,11 +37,11 @@ export function registerAuditTools(server: any, client: LabelInnClient) {
     'create_serial_pool',
     'Create a serialization pool for GS1, UDI, SSCC, or custom serial numbers. Used for compliance tracking.',
     {
-      name: { type: 'string', description: 'Pool name (e.g., "GS1 Shipping Labels Q2 2026")' },
-      format: { type: 'string', description: '"gs1-128", "sgtin-96", "udi", "sscc", "gs1-datamatrix", or "custom"' },
-      pattern: { type: 'string', description: 'Format pattern (e.g., "(01){gtin}(21){serial}")' },
-      start: { type: 'string', description: 'Starting serial number' },
-      count: { type: 'number', description: 'Total pool size' },
+      name: z.string().describe('Pool name (e.g., "GS1 Shipping Labels Q2 2026")'),
+      format: z.string().describe('"gs1-128", "sgtin-96", "udi", "sscc", "gs1-datamatrix", or "custom"'),
+      pattern: z.string().describe('Format pattern (e.g., "(01){gtin}(21){serial}")'),
+      start: z.string().describe('Starting serial number'),
+      count: z.number().describe('Total pool size'),
     },
     async (params: { name: string; format: string; pattern: string; start: string; count: number }) => {
       const result = await client.createSerialPool({
@@ -69,8 +70,8 @@ export function registerAuditTools(server: any, client: LabelInnClient) {
     'allocate_serials',
     'Allocate serial numbers from a pool. Returns the next N unique serial numbers.',
     {
-      pool_id: { type: 'string', description: 'The pool ID' },
-      count: { type: 'number', description: 'How many serials to allocate (1-10000)' },
+      pool_id: z.string().describe('The pool ID'),
+      count: z.number().describe('How many serials to allocate (1-10000)'),
     },
     async (params: { pool_id: string; count: number }) => {
       const result = await client.allocateSerials(params.pool_id, params.count);
@@ -83,9 +84,9 @@ export function registerAuditTools(server: any, client: LabelInnClient) {
     'void_serials',
     'Void (cancel) serial numbers from a pool. Records reason for compliance audit.',
     {
-      pool_id: { type: 'string', description: 'The pool ID' },
-      serials: { type: 'array', description: 'Array of serial numbers to void' },
-      reason: { type: 'string', description: 'Reason for voiding (e.g., "print defect", "label damaged")' },
+      pool_id: z.string().describe('The pool ID'),
+      serials: z.array(z.unknown()).describe('Array of serial numbers to void'),
+      reason: z.string().describe('Reason for voiding (e.g., "print defect", "label damaged")'),
     },
     async (params: { pool_id: string; serials: string[]; reason: string }) => {
       const result = await client.voidSerials(params.pool_id, params.serials, params.reason);
@@ -98,9 +99,9 @@ export function registerAuditTools(server: any, client: LabelInnClient) {
     'create_webhook',
     'Subscribe to real-time events via webhook. Events: print.job.completed, print.job.failed, printer.status.changed, printer.supply.low, etc.',
     {
-      url: { type: 'string', description: 'HTTPS webhook URL to receive events' },
-      events: { type: 'array', description: 'Event types to subscribe to' },
-      description: { type: 'string', description: 'Description', required: false },
+      url: z.string().describe('HTTPS webhook URL to receive events'),
+      events: z.array(z.unknown()).describe('Event types to subscribe to'),
+      description: z.string().optional().describe('Description'),
     },
     async (params: { url: string; events: string[]; description?: string }) => {
       const result = await client.createWebhook(params.url, params.events, params.description);
@@ -124,7 +125,7 @@ export function registerAuditTools(server: any, client: LabelInnClient) {
     'delete_webhook',
     'Delete a webhook subscription.',
     {
-      webhook_id: { type: 'string', description: 'The webhook ID to delete' },
+      webhook_id: z.string().describe('The webhook ID to delete'),
     },
     async (params: { webhook_id: string }) => {
       const result = await client.deleteWebhook(params.webhook_id);
@@ -137,7 +138,7 @@ export function registerAuditTools(server: any, client: LabelInnClient) {
     'get_webhook',
     'Get details of a specific webhook subscription.',
     {
-      webhook_id: { type: 'string', description: 'The webhook ID' },
+      webhook_id: z.string().describe('The webhook ID'),
     },
     async (params: { webhook_id: string }) => {
       const result = await client.get(`/webhooks/${params.webhook_id}`);
@@ -150,10 +151,10 @@ export function registerAuditTools(server: any, client: LabelInnClient) {
     'update_webhook',
     'Update a webhook subscription (URL, events, enabled state).',
     {
-      webhook_id: { type: 'string', description: 'The webhook ID to update' },
-      url: { type: 'string', description: 'New webhook URL', required: false },
-      events: { type: 'array', description: 'New event types', required: false },
-      enabled: { type: 'boolean', description: 'Enable or disable', required: false },
+      webhook_id: z.string().describe('The webhook ID to update'),
+      url: z.string().optional().describe('New webhook URL'),
+      events: z.array(z.unknown()).optional().describe('New event types'),
+      enabled: z.boolean().optional().describe('Enable or disable'),
     },
     async (params: { webhook_id: string; url?: string; events?: string[]; enabled?: boolean }) => {
       const { webhook_id, ...body } = params;
@@ -167,7 +168,7 @@ export function registerAuditTools(server: any, client: LabelInnClient) {
     'test_webhook',
     'Send a test ping to a webhook endpoint to verify it is reachable.',
     {
-      webhook_id: { type: 'string', description: 'The webhook ID to test' },
+      webhook_id: z.string().describe('The webhook ID to test'),
     },
     async (params: { webhook_id: string }) => {
       const result = await client.post(`/webhooks/${params.webhook_id}/test`);
@@ -180,8 +181,8 @@ export function registerAuditTools(server: any, client: LabelInnClient) {
     'webhook_deliveries',
     'List recent delivery attempts for a webhook.',
     {
-      webhook_id: { type: 'string', description: 'The webhook ID' },
-      limit: { type: 'number', description: 'Max deliveries to return', required: false },
+      webhook_id: z.string().describe('The webhook ID'),
+      limit: z.number().optional().describe('Max deliveries to return'),
     },
     async (params: { webhook_id: string; limit?: number }) => {
       const qs = params.limit ? `?limit=${params.limit}` : '';
