@@ -29,3 +29,8 @@
  */
 export { createMcpServer } from './server.js';
 export { handleMcpRequest } from './handler.js';
+/**
+ * Smithery sandbox export — lets Smithery scan tools/resources without real credentials.
+ * Uses a mock API key so the server starts and exposes its tool list for discovery.
+ */
+export declare function createSandboxServer(): import("@modelcontextprotocol/sdk/server/mcp.js").McpServer;

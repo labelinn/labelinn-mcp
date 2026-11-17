@@ -14,6 +14,7 @@ const fleet_js_1 = require("./tools/fleet.js");
 const designs_js_1 = require("./tools/designs.js");
 const jobs_js_1 = require("./tools/jobs.js");
 const rules_js_1 = require("./tools/rules.js");
+const workflows_js_1 = require("./tools/workflows.js");
 const audit_js_1 = require("./tools/audit.js");
 const edge_js_1 = require("./tools/edge.js");
 const sites_js_1 = require("./tools/sites.js");
@@ -32,7 +33,7 @@ function createMcpServer(apiKey, baseUrl) {
     const client = new api_client_js_1.LabelInnClient(apiKey, baseUrl || 'https://labelinn.com/v1');
     const server = new mcp_js_1.McpServer({
         name: 'labelinn',
-        version: '2.0.0',
+        version: '2.3.0',
         description: 'LabelInn Cloud Print API — 90+ tools for printing, fleet management, design editing, rules engine, compliance audit, label verification, Edge Server, sites & geo-routing, batch printing, system diagnostics. Controls Zebra, TSC, Honeywell, Epson, Brother thermal printers.',
     });
     // Register all tool categories
@@ -41,6 +42,7 @@ function createMcpServer(apiKey, baseUrl) {
     (0, designs_js_1.registerDesignTools)(server, client);
     (0, jobs_js_1.registerJobTools)(server, client);
     (0, rules_js_1.registerRulesTools)(server, client);
+    (0, workflows_js_1.registerWorkflowTools)(server, client);
     (0, audit_js_1.registerAuditTools)(server, client);
     (0, edge_js_1.registerEdgeTools)(server, client);
     (0, sites_js_1.registerSitesTools)(server, client);

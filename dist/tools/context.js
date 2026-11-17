@@ -2,6 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerContextTools = registerContextTools;
 const zod_1 = require("zod");
+// UNIFIED PRINTERS R3: format / site aware suggestion, new error codes.
+const printer_suggest_js_1 = require("../utils/printer-suggest.js");
 function registerContextTools(server, client) {
     // ── factory_status ──
     server.tool('factory_status', 'Get a comprehensive factory floor overview: printer fleet health, active jobs, ' +
@@ -85,31 +87,20 @@ function registerContextTools(server, client) {
     // ── suggest_printer ──
     server.tool('suggest_printer', 'Given a label format (ZPL, ESC/POS, image) and optional site, suggest the best available ' +
         'printer based on health scores, current load, and compatibility.', {
-        format: zod_1.z.string().describe('Label format: "zpl", "escpos", "image", "pdf"'),
+        format: zod_1.z.string().describe('What to print: "zpl", "escpos" (receipt), "image", "pdf", "template" (a design), "office" or "color"'),
         site_id: zod_1.z.string().optional().describe('Optional site to restrict printer selection'),
     }, async (params) => {
-        // Get all printers
-        const printers = (await client.listPrinters('online'));
-        if (!Array.isArray(printers) || printers.length === 0) {
-            return {
-                content: [{
-                        type: 'text',
-                        text: JSON.stringify({
-                            suggestion: null,
-                            reason: 'No online printers available',
-                        }),
-                    }],
-            };
-        }
-        // Return the list with a hint for AI to pick
+        // UNIFIED PRINTERS R3: `format` and `site_id` decide. Every printer
+        // (not only online ones) so an offline-only fleet still gets an answer.
+        const printers = (await client.listPrinters());
+        const result = (0, printer_suggest_js_1.suggestPrinters)(Array.isArray(printers) ? printers : [], params.format, params.site_id);
         return {
             content: [{
                     type: 'text',
                     text: JSON.stringify({
-                        format_requested: params.format,
-                        site_filter: params.site_id || 'any',
-                        available_printers: printers,
-                        hint: 'Select the printer with the highest health score that supports the requested format.',
+                        ...result,
+                        formats: printer_suggest_js_1.SUGGEST_FORMATS,
+                        hint: 'Use suggestion.id as printer_id. zpl → print_zpl; image / pdf → print_image; template → print_label.',
                     }, null, 2),
                 }],
         };
@@ -148,6 +139,25 @@ function registerContextTools(server, client) {
                 fixes: ['Retry job', 'Check network latency', 'Restart printer spooler'],
             },
         };
+        // UNIFIED PRINTERS R3: the API's print error codes, checked first (the
+        // longest code wins: UPLOAD_EXPIRED before EXPIRED-like substrings).
+        const codes = Object.keys(printer_suggest_js_1.PRINT_ERROR_CODES).sort((a, b) => b.length - a.length);
+        const apiCode = codes.find((c) => params.error.toUpperCase().includes(c));
+        if (apiCode) {
+            const e = printer_suggest_js_1.PRINT_ERROR_CODES[apiCode];
+            return {
+                content: [{
+                        type: 'text',
+                        text: JSON.stringify({
+                            original_error: params.error,
+                            known_error: apiCode,
+                            explanation: e.explanation,
+                            possible_causes: e.causes,
+                            suggested_fixes: e.fixes,
+                        }, null, 2),
+                    }],
+            };
+        }
         const errorUpper = params.error.toUpperCase();
         const match = Object.entries(knownErrors).find(([key]) => errorUpper.includes(key));
         const result = {

@@ -12,6 +12,7 @@ import { registerFleetTools } from './tools/fleet.js';
 import { registerDesignTools } from './tools/designs.js';
 import { registerJobTools } from './tools/jobs.js';
 import { registerRulesTools } from './tools/rules.js';
+import { registerWorkflowTools } from './tools/workflows.js';
 import { registerAuditTools } from './tools/audit.js';
 import { registerEdgeTools } from './tools/edge.js';
 import { registerSitesTools } from './tools/sites.js';
@@ -32,7 +33,7 @@ export function createMcpServer(apiKey: string, baseUrl?: string): { server: Mcp
 
   const server = new McpServer({
     name: 'labelinn',
-    version: '2.0.0',
+    version: '2.3.0',
     description: 'LabelInn Cloud Print API — 90+ tools for printing, fleet management, design editing, rules engine, compliance audit, label verification, Edge Server, sites & geo-routing, batch printing, system diagnostics. Controls Zebra, TSC, Honeywell, Epson, Brother thermal printers.',
   });
 
@@ -42,6 +43,7 @@ export function createMcpServer(apiKey: string, baseUrl?: string): { server: Mcp
   registerDesignTools(server, client);
   registerJobTools(server, client);
   registerRulesTools(server, client);
+  registerWorkflowTools(server, client);
   registerAuditTools(server, client);
   registerEdgeTools(server, client);
   registerSitesTools(server, client);

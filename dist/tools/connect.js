@@ -5,12 +5,21 @@ const zod_1 = require("zod");
 function registerConnectTools(server, client) {
     // ── ingest_data ──
     server.tool('ingest_data', 'Ingest data from external sources (CSV, Excel, JSON, XML, API). Data is parsed and can be used for variable-driven label printing.', {
-        source_type: zod_1.z.string().describe('"csv", "json", "xml", "excel", "api"'),
-        data: zod_1.z.string().describe('Raw data content or API URL'),
-        mapping: zod_1.z.record(zod_1.z.string(), zod_1.z.unknown()).optional().describe('Field mapping: {"sku": "column_A", "name": "column_B"}'),
+        source_type: zod_1.z.string().describe('"csv", "json", "xml", "tsv", "ndjson"'),
+        data: zod_1.z.string().describe('Raw data content'),
+        source_id: zod_1.z.string().optional().describe('Existing connector source to ingest into (omit to auto-create one)'),
+        mapping: zod_1.z.record(zod_1.z.string(), zod_1.z.unknown()).optional().describe('Field mapping saved on the source after ingest: {"design_var": "source.field"}'),
     }, async (params) => {
-        const result = await client.ingestData(params.data, params.source_type, params.mapping ? JSON.stringify(params.mapping) : undefined);
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        // Previously the mapping JSON was sent as the source id, and the data went
+        // in a field the API does not read.
+        const result = await client.ingestData(params.data, params.source_type, params.source_id);
+        const sourceId = params.source_id || (result && typeof result.source_id === 'string' ? result.source_id : undefined);
+        let mappingResult;
+        if (params.mapping && sourceId) {
+            mappingResult = await client.updateConnectorMappings(sourceId, params.mapping);
+        }
+        const out = mappingResult === undefined ? result : { ingest: result, mappings: mappingResult };
+        return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }] };
     });
     // ── test_parse ──
     server.tool('test_parse', 'Test-parse data to preview how it would be interpreted. Returns parsed rows without saving.', {

@@ -7,6 +7,8 @@
  */
 import { LabelInnClient } from '../utils/api-client.js';
 import { z } from 'zod';
+// UNIFIED PRINTERS R3: format / site aware suggestion, new error codes.
+import { suggestPrinters, PRINT_ERROR_CODES, SUGGEST_FORMATS } from '../utils/printer-suggest.js';
 
 export function registerContextTools(server: any, client: LabelInnClient) {
   // ── factory_status ──
@@ -112,33 +114,23 @@ export function registerContextTools(server: any, client: LabelInnClient) {
     'Given a label format (ZPL, ESC/POS, image) and optional site, suggest the best available ' +
     'printer based on health scores, current load, and compatibility.',
     {
-      format: z.string().describe('Label format: "zpl", "escpos", "image", "pdf"'),
+      format: z.string().describe('What to print: "zpl", "escpos" (receipt), "image", "pdf", "template" (a design), "office" or "color"'),
       site_id: z.string().optional().describe('Optional site to restrict printer selection'),
     },
     async (params: { format: string; site_id?: string }) => {
-      // Get all printers
-      const printers = (await client.listPrinters('online')) as unknown[];
-      if (!Array.isArray(printers) || printers.length === 0) {
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({
-              suggestion: null,
-              reason: 'No online printers available',
-            }),
-          }],
-        };
-      }
-
-      // Return the list with a hint for AI to pick
+      // UNIFIED PRINTERS R3: `format` and `site_id` decide. Every printer
+      // (not only online ones) so an offline-only fleet still gets an answer.
+      const printers = (await client.listPrinters()) as unknown[];
+      const result = suggestPrinters(
+        Array.isArray(printers) ? (printers as Record<string, unknown>[]) : [],
+        params.format, params.site_id);
       return {
         content: [{
           type: 'text',
           text: JSON.stringify({
-            format_requested: params.format,
-            site_filter: params.site_id || 'any',
-            available_printers: printers,
-            hint: 'Select the printer with the highest health score that supports the requested format.',
+            ...result,
+            formats: SUGGEST_FORMATS,
+            hint: 'Use suggestion.id as printer_id. zpl → print_zpl; image / pdf → print_image; template → print_label.',
           }, null, 2),
         }],
       };
@@ -183,6 +175,25 @@ export function registerContextTools(server: any, client: LabelInnClient) {
           fixes: ['Retry job', 'Check network latency', 'Restart printer spooler'],
         },
       };
+      // UNIFIED PRINTERS R3: the API's print error codes, checked first (the
+      // longest code wins: UPLOAD_EXPIRED before EXPIRED-like substrings).
+      const codes = Object.keys(PRINT_ERROR_CODES).sort((a, b) => b.length - a.length);
+      const apiCode = codes.find((c) => params.error.toUpperCase().includes(c));
+      if (apiCode) {
+        const e = PRINT_ERROR_CODES[apiCode];
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              original_error: params.error,
+              known_error: apiCode,
+              explanation: e.explanation,
+              possible_causes: e.causes,
+              suggested_fixes: e.fixes,
+            }, null, 2),
+          }],
+        };
+      }
 
       const errorUpper = params.error.toUpperCase();
       const match = Object.entries(knownErrors).find(([key]) => errorUpper.includes(key));

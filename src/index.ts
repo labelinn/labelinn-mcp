@@ -37,6 +37,15 @@ import { createMcpServer } from './server.js';
 export { createMcpServer } from './server.js';
 export { handleMcpRequest } from './handler.js';
 
+/**
+ * Smithery sandbox export — lets Smithery scan tools/resources without real credentials.
+ * Uses a mock API key so the server starts and exposes its tool list for discovery.
+ */
+export function createSandboxServer() {
+  const { server } = createMcpServer('sk_test_sandbox_scan', 'https://labelinn.com/v1');
+  return server;
+}
+
 // ── Rate Limiter (in-memory sliding window) ──
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
@@ -158,7 +167,7 @@ async function main() {
         res.end(JSON.stringify({
           status: 'ok',
           server: 'labelinn-mcp',
-          version: '2.0.0',
+          version: '2.3.0',
           transport: 'streamable-http',
           tools: 112,
         }));
@@ -242,7 +251,7 @@ async function main() {
     process.on('SIGINT', shutdown);
 
     httpServer.listen(port, '0.0.0.0', () => {
-      console.log(`🖨️  LabelInn MCP Server v2.0.0 (Streamable HTTP)`);
+      console.log(`🖨️  LabelInn MCP Server v2.3.0 (Streamable HTTP)`);
       console.log(`   Endpoint:    http://0.0.0.0:${port}/mcp`);
       console.log(`   Health:      http://0.0.0.0:${port}/health`);
       console.log(`   CORS:        ${corsOrigin}`);
@@ -257,7 +266,26 @@ async function main() {
       console.error('Set it to your LabelInn API key (sk_live_xxx or sk_test_xxx).');
       process.exit(1);
     }
-    const { server } = createMcpServer(envApiKey, baseUrl);
+    const { server, client } = createMcpServer(envApiKey, baseUrl);
+
+    // Edge discovery: when the LabelInn desktop app is running on this same
+    // machine, its edge HTTP server (default port 6631) drops a descriptor
+    // at ~/.labelinn/edge.json. If it's there and answers /local/v1/health,
+    // print/fleet tools route through localhost instead of going to the
+    // cloud — matters for local LLMs that have no reason to hairpin
+    // through the public internet to reach a printer plugged into the
+    // same machine. Falls back to cloud silently when the desktop app
+    // isn't running or the edge is disabled.
+    const edgeFound = await client.discoverEdge().catch(() => false);
+    if (edgeFound) {
+      const d = client.getEdgeDescriptor();
+      // stderr only — stdout is reserved for the MCP JSON-RPC transport
+      console.error(
+        `🖨️  Edge detected: ${client.getEdgeUrl()}` +
+          (d?.deviceId ? ` (device ${d.deviceId})` : ''),
+      );
+    }
+
     const transport = new StdioServerTransport();
     await server.connect(transport);
   }

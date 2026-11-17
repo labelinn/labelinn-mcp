@@ -1,6 +1,6 @@
 {
   "name": "@labelinn/mcp-server",
-  "version": "2.0.0",
+  "version": "2.3.0",
   "description": "LabelInn MCP Server — Let AI assistants print labels, manage printers, and control your fleet. 120+ tools for Claude, GPT, and Copilot.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -18,12 +18,25 @@
   },
   "files": [
     "dist/**/*",
-    "README.md"
+    "README.md",
+    "smithery.yaml"
   ],
   "keywords": [
-    "mcp", "model-context-protocol", "labelinn", "printing", "thermal-printer",
-    "zebra", "label", "claude", "copilot", "ai-agent", "fleet-management",
-    "barcode", "zpl", "esc-pos", "warehouse"
+    "mcp",
+    "model-context-protocol",
+    "labelinn",
+    "printing",
+    "thermal-printer",
+    "zebra",
+    "label",
+    "claude",
+    "copilot",
+    "ai-agent",
+    "fleet-management",
+    "barcode",
+    "zpl",
+    "esc-pos",
+    "warehouse"
   ],
   "license": "MIT",
   "repository": {
@@ -39,9 +52,9 @@
     "@modelcontextprotocol/sdk": "^1.12.0"
   },
   "devDependencies": {
-    "typescript": "^5.4.0",
     "@types/node": "^20.0.0",
-    "ts-node": "^10.9.0"
+    "ts-node": "^10.9.0",
+    "typescript": "^5.9.3"
   },
   "engines": {
     "node": ">=18"

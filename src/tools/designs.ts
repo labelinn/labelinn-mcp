@@ -44,6 +44,39 @@ export function registerDesignTools(server: any, client: LabelInnClient) {
     }
   );
 
+  // ── get_design_binding_guide ──
+  // Keep this local-MCP guide in lockstep with the hosted MCP endpoint. It is
+  // deliberately read-only: agents should learn the persisted design syntax
+  // before they edit an HTML or Symbol element.
+  server.tool(
+    'get_design_binding_guide',
+    'Explain HTML template variables, Date/Time bindings, and row-driven symbol lists before authoring or printing a LabelInn design.',
+    {},
+    async () => ({
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          html_variables: {
+            syntax: 'Use double braces in an HTML element: {{printed_at}} or {{product_name}}.',
+            binding: 'The token name remains the design variable name. Bind it to a source such as Date/Time, Excel, API, integration, or leave it unbound for print-form/workflow data.',
+            date_time: 'For {{printed_at}}, bind the Date/Time source and choose current time, an order date, or a fixed date plus its format.',
+            note: 'Single braces in CSS or JavaScript are not variables; only {{token}} is dynamic data.',
+          },
+          row_driven_symbols: {
+            binding: 'Bind a Symbol element to a source whose value is a per-row comma-separated list of catalogue keys.',
+            example: 'ghs/ghs02_flammable, ghs/ghs05_corrosive',
+            behavior: 'A non-empty row value replaces the manually selected symbol list for that row and the strip reflows. An empty value keeps the manually selected list as fallback.',
+          },
+          next_steps: [
+            'Use get_design_variables to inspect the names that a design accepts.',
+            'Pass matching keys in print_label.data or workflow row data.',
+            'Use get_design and the design-element tools when changing a saved design.',
+          ],
+        }, null, 2),
+      }],
+    })
+  );
+
   // ── clone_design ──
   server.tool(
     'clone_design',

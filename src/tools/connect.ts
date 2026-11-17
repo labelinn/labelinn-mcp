@@ -10,13 +10,22 @@ export function registerConnectTools(server: any, client: LabelInnClient) {
     'ingest_data',
     'Ingest data from external sources (CSV, Excel, JSON, XML, API). Data is parsed and can be used for variable-driven label printing.',
     {
-      source_type: z.string().describe('"csv", "json", "xml", "excel", "api"'),
-      data: z.string().describe('Raw data content or API URL'),
-      mapping: z.record(z.string(), z.unknown()).optional().describe('Field mapping: {"sku": "column_A", "name": "column_B"}'),
+      source_type: z.string().describe('"csv", "json", "xml", "tsv", "ndjson"'),
+      data: z.string().describe('Raw data content'),
+      source_id: z.string().optional().describe('Existing connector source to ingest into (omit to auto-create one)'),
+      mapping: z.record(z.string(), z.unknown()).optional().describe('Field mapping saved on the source after ingest: {"design_var": "source.field"}'),
     },
-    async (params: { source_type: string; data: string; mapping?: Record<string, string> }) => {
-      const result = await client.ingestData(params.data, params.source_type, params.mapping ? JSON.stringify(params.mapping) : undefined);
-      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    async (params: { source_type: string; data: string; source_id?: string; mapping?: Record<string, string> }) => {
+      // Previously the mapping JSON was sent as the source id, and the data went
+      // in a field the API does not read.
+      const result = await client.ingestData(params.data, params.source_type, params.source_id) as Record<string, unknown>;
+      const sourceId = params.source_id || (result && typeof result.source_id === 'string' ? result.source_id : undefined);
+      let mappingResult: unknown;
+      if (params.mapping && sourceId) {
+        mappingResult = await client.updateConnectorMappings(sourceId, params.mapping as Record<string, string>);
+      }
+      const out = mappingResult === undefined ? result : { ingest: result, mappings: mappingResult };
+      return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }] };
     }
   );
 

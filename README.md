@@ -107,6 +107,23 @@ LABELINN_API_KEY=sk_live_xxx npm start
 |----------|----------|-------------|
 | `LABELINN_API_KEY` | Yes | Your API key (`sk_live_*` or `sk_test_*`) |
 | `LABELINN_BASE_URL` | No | Override API URL (default: `https://labelinn.com/v1`) |
+| `LABELINN_EDGE_URL` | No | Local edge server URL; by default it is read from `~/.labelinn/edge.json` |
+| `LABELINN_EDGE_TOKEN` | No | Edge bearer token (default: `authToken` from `edge.json`) |
+| `LABELINN_EDGE_TLS_SHA256` | No | Certificate pin for an `https://` `LABELINN_EDGE_URL` (default: `tlsSha256` from `edge.json`) |
+
+### Local edge server and TLS
+
+When the LabelInn desktop app runs on the same machine, print and printer-list
+tools go through its local LAN API (`/local/v1/*`, port 6631) instead of the
+cloud. If the app serves that API over HTTPS with its own self-signed
+certificate, `edge.json` carries `tlsSha256` and the server pins it: the
+certificate is checked before any request is sent, and a mismatch disables the
+local path (the cloud path keeps working). PCs without TLS, or older app
+versions, keep working over plain http.
+
+Some local diagnostic tools (metrics, verification scans, system logs and
+config) call routes that current desktop app versions no longer serve on the
+LAN API; they now say so instead of returning a bare 404.
 
 ## API Key
 
